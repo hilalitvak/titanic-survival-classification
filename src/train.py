@@ -51,6 +51,8 @@ def fetch_data():
 def train():
     torch.manual_seed(SEED)
     np.random.seed(SEED)
+    import time
+    t_start = time.time()
 
     # --- Data ---
     fetch_data()
@@ -122,7 +124,10 @@ def train():
 
         if epochs_no_improve >= PATIENCE:
             print(f'\nEarly stopping at epoch {epoch} (best val_auc={best_auc:.4f})')
+            best_epoch = epoch - PATIENCE
             break
+    else:
+        best_epoch = EPOCHS
 
     # --- Restore best model and print final metrics ---
     model.load_state_dict(best_state)
@@ -148,10 +153,15 @@ def train():
 
     with open(SAVE_PATH, 'wb') as f:
         pickle.dump({
-            'model_state': model.state_dict(),
-            'params':      params,
-            'val_metrics': val_metrics,
-            'val_data':    val_data,
+            'model_state':    model.state_dict(),
+            'params':         params,
+            'val_metrics':    val_metrics,
+            'val_data':       val_data,
+            'train_metadata': {
+                'epochs':       best_epoch,
+                'batch_size':   BATCH_SIZE,
+                'train_time_s': round(time.time() - t_start, 1),
+            },
         }, f)
     print(f'\nCheckpoint saved → {SAVE_PATH}')
 
