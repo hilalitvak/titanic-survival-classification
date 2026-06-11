@@ -6,6 +6,7 @@ KEEP_TITLES = {'Mr', 'Miss', 'Mrs', 'Master'}
 
 FEATURES = [
     'Pclass', 'Age', 'FamilySize', 'fare_per_person', 'has_cabin',
+    'age_child', 'age_adult', 'age_senior',
     'Title_Master', 'Title_Miss', 'Title_Mr', 'Title_Mrs', 'Title_Rare',
     'Embarked_C', 'Embarked_Q', 'Embarked_S',
 ]
@@ -20,26 +21,31 @@ def _extract_titles(df: pd.DataFrame) -> pd.Series:
 
 
 def _build_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Construct features from raw dataframe. This is used by both fit_transform and transform."""
     out = pd.DataFrame(index=df.index)
-    out['Pclass']         = df['Pclass']
-    out['Age']            = df['Age']
-    out['FamilySize']     = df['SibSp'] + df['Parch'] + 1
-    out['has_cabin']      = df['Cabin'].notna().astype(int)
+    out['Pclass']          = df['Pclass']
+    out['Age']             = df['Age']
+    out['FamilySize']      = df['SibSp'] + df['Parch'] + 1
+    out['has_cabin']       = df['Cabin'].notna().astype(int)
     out['fare_per_person'] = df['Fare'] / out['FamilySize']
-    out['Title']          = _extract_titles(df)
-    out['Embarked']       = df['Embarked']
+    out['Title']           = _extract_titles(df)
+    out['Embarked']        = df['Embarked']
+    return out
+
+
+def _add_age_groups(out: pd.DataFrame) -> pd.DataFrame:
+    """Add age group dummies after Age has been imputed."""
+    out['age_child']  = (out['Age'] < 15).astype(int)
+    out['age_senior'] = (out['Age'] > 60).astype(int)
+    out['age_adult']  = ((out['Age'] >= 15) & (out['Age'] <= 60)).astype(int)
     return out
 
 
 def fit_transform(df: pd.DataFrame):
-    """Fit preprocessing on df (training set) and return transformed X, y, and params dict. 
-    What it does? impute missing values, encode categorical variables, and scale features.
-    """
+    """Fit preprocessing on df (training set) and return transformed X, y, and params dict."""
     out = _build_features(df)
 
     # Impute — fit values on training data only
-    age_by_title = out.groupby('Title')['Age'].median()
+    age_by_title  = out.groupby('Title')['Age'].median()
     embarked_mode = out['Embarked'].mode()[0]
 
     out['Age']      = out.apply(
@@ -47,10 +53,9 @@ def fit_transform(df: pd.DataFrame):
     )
     out['Embarked'] = out['Embarked'].fillna(embarked_mode)
 
-    # Encode
+    out = _add_age_groups(out)
     out = pd.get_dummies(out, columns=['Title', 'Embarked'], drop_first=False)
 
-    # Ensure all expected columns exist (handles unseen categories at inference)
     for col in FEATURES:
         if col not in out.columns:
             out[col] = 0
@@ -70,8 +75,7 @@ def fit_transform(df: pd.DataFrame):
 
 
 def transform(df: pd.DataFrame, params: dict) -> np.ndarray:
-    """Apply pre-fitted params to a new dataframe (validation / inference). Returns transformed X.
-    adds missing features with default values, and applies the same imputation and encoding as fit_transform."""
+    """Apply pre-fitted params to a new dataframe (validation / inference)."""
     out = _build_features(df)
 
     age_by_title  = params['age_by_title']
@@ -84,6 +88,7 @@ def transform(df: pd.DataFrame, params: dict) -> np.ndarray:
     )
     out['Embarked'] = out['Embarked'].fillna(embarked_mode)
 
+    out = _add_age_groups(out)
     out = pd.get_dummies(out, columns=['Title', 'Embarked'], drop_first=False)
 
     for col in FEATURES:

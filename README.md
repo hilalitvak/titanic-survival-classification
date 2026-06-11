@@ -61,20 +61,24 @@ This will:
 - Fetch `data/train.csv` (Kaggle API or GitHub mirror)
 - Split into 80% train / 20% validation (stratified, seed=42)
 - Preprocess: extract Title from Name, impute Age per-Title median, encode, scale
-- Train a 3-layer MLP for 60 epochs
-- Print loss + validation accuracy every 10 epochs, then final metrics
+- Train a 3-layer MLP (up to 200 epochs with early stopping)
+- Print loss, val accuracy, val AUC, and LR every 5 epochs, then final metrics
 - Save `models/checkpoint.pkl`
 
 Example output:
 ```
-✓ Downloaded train.csv from Kaggle API.
-Epoch  10/60  loss=0.4821  val_acc=0.8156
-Epoch  20/60  loss=0.4103  val_acc=0.8268
+✓ Using cached data/train.csv
+Epoch  10/200  loss=0.5279  val_acc=0.8436  val_auc=0.8787  lr=1.00e-03
+Epoch  20/200  loss=0.4929  val_acc=0.8436  val_auc=0.8776  lr=1.00e-03
 ...
+Early stopping at epoch 30 (best val_auc=0.8798)
+
 === Validation Metrics ===
-Accuracy : 0.8324
-F1       : 0.7921
-ROC-AUC  : 0.8871
+Accuracy  : 0.8380
+Precision : 0.7703
+Recall    : 0.8261
+F1        : 0.7972
+ROC-AUC   : 0.8798
 
 Checkpoint saved → models/checkpoint.pkl
 ```
@@ -109,6 +113,7 @@ The app walks through three explicit steps:
 | `Title` | Extracted from Name | Strongest single feature (Cramér's V=0.57); encodes sex + age + social status |
 | `Pclass` | Raw | Strong linear signal (r=−0.34) |
 | `Age` | Imputed per-Title median | Per-group imputation avoids distorting Master (boys) with the adult median |
+| `age_child` / `age_adult` / `age_senior` | Age < 15 / 15–60 / > 60 | Captures non-linear lifeboat priority effect; children and elderly had distinct survival odds |
 | `fare_per_person` | Fare / FamilySize | Normalises group-ticket inflation |
 | `FamilySize` | SibSp + Parch + 1 | Non-linear survival curve — mid-size families survived most |
 | `has_cabin` | Binary flag from Cabin | 77% missing; missingness itself is informative (1st class had cabins) |
@@ -121,7 +126,7 @@ The app walks through three explicit steps:
 3-layer MLP implemented in PyTorch:
 
 ```
-Input (13) → Linear(64) → ReLU → Dropout(0.3)
+Input (16) → Linear(64) → ReLU → Dropout(0.3)
            → Linear(32) → ReLU → Dropout(0.3)
            → Linear(1)  → (raw logit)
 ```
