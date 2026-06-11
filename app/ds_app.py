@@ -38,9 +38,18 @@ st.markdown('Upload any Titanic-format CSV. If none is uploaded, the default `da
 
 uploaded = st.file_uploader('Upload a CSV file', type='csv')
 
+REQUIRED_COLS = {'Pclass', 'Name', 'Age', 'SibSp', 'Parch', 'Fare', 'Cabin', 'Embarked'}
+
 if uploaded is not None:
     df = pd.read_csv(uploaded)
-    st.success(f'Loaded uploaded file — {len(df)} rows.')
+    if df.empty:
+        st.error('Uploaded file is empty.')
+        st.stop()
+    missing = REQUIRED_COLS - set(df.columns)
+    if missing:
+        st.error(f'Uploaded file is missing required columns: `{", ".join(sorted(missing))}`')
+        st.stop()
+    st.success(f'Dataset uploaded successfully — {len(df)} rows.')
 else:
     default = ROOT / 'data' / 'train.csv'
     if default.exists():
