@@ -32,26 +32,20 @@ st.markdown(
 
 st.divider()
 
-# ── Load checkpoint ─────────────────────────────────────────────────────────────
-checkpoint_input = st.text_input('Checkpoint path', value=str(CHECKPOINT_PATH))
-try:
-    with open(checkpoint_input, 'rb') as f:
-        ckpt = pickle.load(f)
-    model = MLP()
-    model.load_state_dict(ckpt['model_state'])
-    model.eval()
-except FileNotFoundError:
-    st.error('Checkpoint not found. Run `python src/train.py` first.')
-    st.stop()
-
 # ── Section 0: Architecture ────────────────────────────────────────────────────
 st.subheader('Model Architecture')
 
-meta = ckpt.get('train_metadata', {})
-c1, c2, c3 = st.columns(3)
-c1.metric('Epochs (best)',  meta.get('epochs', '—'))
-c2.metric('Batch Size',     meta.get('batch_size', '—'))
-c3.metric('Training Time',  f'{meta.get("train_time_s", "—")}s')
+# Load checkpoint silently for architecture info
+try:
+    with open(CHECKPOINT_PATH, 'rb') as f:
+        ckpt_default = pickle.load(f)
+    meta = ckpt_default.get('train_metadata', {})
+    c1, c2, c3 = st.columns(3)
+    c1.metric('Epochs (best)',  meta.get('epochs', '—'))
+    c2.metric('Batch Size',     meta.get('batch_size', '—'))
+    c3.metric('Training Time',  f'{meta.get("train_time_s", "—")}s')
+except FileNotFoundError:
+    pass
 
 st.markdown(f"""
 | Layer | Input | Output | Activation |
@@ -67,24 +61,29 @@ st.markdown(f"""
 
 st.divider()
 
-# ── Section 1: Model Evaluation (validation set) ───────────────────────────────
+# ── Step 1: Model Evaluation ───────────────────────────────────────────────────
 st.subheader('Step 1 — Model Evaluation')
 st.markdown('Evaluated on the held-out validation split (20%, stratified, seed=42).')
 
-m = ckpt['val_metrics']
-c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric('Accuracy',  f'{m["accuracy"]:.3f}')
-c2.metric('Precision', f'{m["precision"]:.3f}')
-c3.metric('Recall',    f'{m["recall"]:.3f}')
-c4.metric('F1 Score',  f'{m["f1"]:.3f}')
-c5.metric('ROC-AUC',   f'{m["roc_auc"]:.3f}')
-
-vd = ckpt['val_data']
-st.pyplot(plot_results(vd['y_true'], vd['y_probs']))
+try:
+    with open(CHECKPOINT_PATH, 'rb') as f:
+        ckpt = pickle.load(f)
+    m = ckpt['val_metrics']
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric('Accuracy',  f'{m["accuracy"]:.3f}')
+    c2.metric('Precision', f'{m["precision"]:.3f}')
+    c3.metric('Recall',    f'{m["recall"]:.3f}')
+    c4.metric('F1 Score',  f'{m["f1"]:.3f}')
+    c5.metric('ROC-AUC',   f'{m["roc_auc"]:.3f}')
+    vd = ckpt['val_data']
+    st.pyplot(plot_results(vd['y_true'], vd['y_probs']))
+except FileNotFoundError:
+    st.error('Checkpoint not found. Run `python src/train.py` first.')
+    st.stop()
 
 st.divider()
 
-# ── Section 2: Upload dataset ──────────────────────────────────────────────────
+# ── Step 2: Upload dataset ─────────────────────────────────────────────────────
 st.subheader('Step 2 — Provide a Dataset')
 st.markdown('Upload a Titanic-format CSV to run inference on new passengers.')
 
@@ -106,8 +105,27 @@ else:
 
 st.divider()
 
-# ── Section 3: Inference ───────────────────────────────────────────────────────
-st.subheader('Step 3 — Inference')
+# ── Step 3: Load model ─────────────────────────────────────────────────────────
+st.subheader('Step 3 — Load Trained Model')
+st.markdown('Load the trained model from disk (produced by `src/train.py`).')
+
+checkpoint_input = st.text_input('Checkpoint path', value=str(CHECKPOINT_PATH))
+
+try:
+    with open(checkpoint_input, 'rb') as f:
+        ckpt = pickle.load(f)
+    model = MLP()
+    model.load_state_dict(ckpt['model_state'])
+    model.eval()
+    st.success(f'Model loaded successfully from `{checkpoint_input}`.')
+except FileNotFoundError:
+    st.error(f'Checkpoint not found at `{checkpoint_input}`. Run `python src/train.py` first.')
+    st.stop()
+
+st.divider()
+
+# ── Step 4: Inference ──────────────────────────────────────────────────────────
+st.subheader('Step 4 — Inference')
 
 X = transform(df, ckpt['params'])
 with torch.no_grad():
@@ -117,18 +135,15 @@ preds = (probs >= 0.5).astype(int)
 
 LABEL = {0: 'Died', 1: 'Survived'}
 
-# If ground truth is available show metrics + plots for the new data
 if 'Survived' in df.columns:
     y = df['Survived'].values
     st.markdown('Ground truth found — showing evaluation results on uploaded data.')
-
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric('Accuracy',  f'{accuracy_score(y, preds):.3f}')
     c2.metric('Precision', f'{precision_score(y, preds):.3f}')
     c3.metric('Recall',    f'{recall_score(y, preds):.3f}')
     c4.metric('F1 Score',  f'{f1_score(y, preds):.3f}')
     c5.metric('ROC-AUC',   f'{roc_auc_score(y, probs):.3f}')
-
     st.pyplot(plot_results(y, probs))
 else:
     st.info('No `Survived` column found — showing predictions only.')
