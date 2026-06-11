@@ -2,6 +2,8 @@
 
 End-to-end classification pipeline predicting Titanic passenger survival using a PyTorch MLP, with an interactive Streamlit inference UI.
 
+🔗 **Live demo:** [hila-litvak-titanic-survival-classification-model.streamlit.app](https://hila-litvak-titanic-survival-classification-model.streamlit.app/)
+
 ---
 
 ## Project Structure
