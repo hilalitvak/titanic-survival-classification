@@ -32,8 +32,8 @@ End-to-end classification pipeline predicting Titanic passenger survival using a
 ## Setup
 
 ```bash
-git clone <your-repo-url>
-cd <your-repo>
+git clone https://github.com/hilalitvak/titanic-survival-classification.git
+cd titanic-survival-classification
 pip install -r requirements.txt
 ```
 
@@ -89,18 +89,20 @@ Checkpoint saved → models/checkpoint.pkl
 streamlit run app/ds_app.py
 ```
 
-The app walks through three explicit steps:
+The app is structured into four sections:
 
-| Step | What happens |
-|------|-------------|
-| **1 — Provide a dataset** | Upload any Titanic-format CSV, or leave blank to use `data/train.csv` automatically |
-| **2 — Load trained model** | Checkpoint is loaded from `models/checkpoint.pkl` and status is confirmed on screen |
-| **3 — Run inference** | Click **Run Inference** to generate predictions and view results |
+| Section | What happens |
+|---------|-------------|
+| **Architecture** | Model layer table, training epochs, batch size, and training time |
+| **Step 1 — Model Evaluation** | Validation metrics and plots loaded automatically from the checkpoint |
+| **Step 2 — Provide a Dataset** | Upload any Titanic-format CSV to run inference on new passengers |
+| **Step 3 — Load Trained Model** | Checkpoint path input (pre-filled to `models/checkpoint.pkl`) |
+| **Step 4 — Inference & Evaluation** | Predictions table + metrics and plots on the uploaded data |
 
 **Results include:**
 - 5 metrics: Accuracy, Precision, Recall, F1, ROC-AUC
 - 3 plots: Confusion Matrix, ROC Curve, Precision–Recall Curve
-- Predictions table: passenger details, ground truth, model prediction, and survival probability
+- Predictions table: Name, Pclass, Sex, Age, Actual, Prediction, P(Survive)
 
 ---
 
