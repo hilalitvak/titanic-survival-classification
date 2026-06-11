@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score
 import pandas as pd
 
 from preprocess import fit_transform, transform
@@ -136,8 +136,23 @@ def train():
 
     # --- Save ---
     SAVE_PATH.parent.mkdir(exist_ok=True)
+    val_preds = (val_probs >= 0.5).astype(int)
+    val_metrics = {
+        'accuracy':  float(accuracy_score(y_val, val_preds)),
+        'precision': float(precision_score(y_val, val_preds)),
+        'recall':    float(recall_score(y_val, val_preds)),
+        'f1':        float(f1_score(y_val, val_preds)),
+        'roc_auc':   float(roc_auc_score(y_val, val_probs)),
+    }
+    val_data = {'y_true': y_val, 'y_probs': val_probs}
+
     with open(SAVE_PATH, 'wb') as f:
-        pickle.dump({'model_state': model.state_dict(), 'params': params}, f)
+        pickle.dump({
+            'model_state': model.state_dict(),
+            'params':      params,
+            'val_metrics': val_metrics,
+            'val_data':    val_data,
+        }, f)
     print(f'\nCheckpoint saved → {SAVE_PATH}')
 
 
