@@ -89,19 +89,21 @@ st.markdown('Upload a Titanic-format CSV to run inference on new passengers.')
 
 uploaded = st.file_uploader('Upload a CSV file', type='csv')
 
+df = None
 if uploaded is not None:
     df = pd.read_csv(uploaded)
     if df.empty:
         st.error('Uploaded file is empty.')
-        st.stop()
-    missing = REQUIRED_COLS - set(df.columns)
-    if missing:
-        st.error(f'Uploaded file is missing required columns: `{", ".join(sorted(missing))}`')
-        st.stop()
-    st.success(f'Dataset uploaded successfully — {len(df)} rows.')
+        df = None
+    else:
+        missing = REQUIRED_COLS - set(df.columns)
+        if missing:
+            st.error(f'Uploaded file is missing required columns: `{", ".join(sorted(missing))}`')
+            df = None
+        else:
+            st.success(f'Dataset uploaded successfully — {len(df)} rows.')
 else:
-    st.info('No file uploaded yet — upload a CSV above to run inference.')
-    st.stop()
+    st.info('No file uploaded yet — upload a CSV above to see predictions on new data.')
 
 st.divider()
 
@@ -125,37 +127,49 @@ except FileNotFoundError:
 st.divider()
 
 # ── Step 4: Inference ──────────────────────────────────────────────────────────
-st.subheader('Step 4 — Inference')
-
-X = transform(df, ckpt['params'])
-with torch.no_grad():
-    logits = model(torch.tensor(X)).numpy()
-probs = 1 / (1 + np.exp(-logits))
-preds = (probs >= 0.5).astype(int)
+st.subheader('Step 4 — Inference & Evaluation')
 
 LABEL = {0: 'Died', 1: 'Survived'}
 
-if 'Survived' in df.columns:
-    y = df['Survived'].values
-    st.markdown('Ground truth found — showing evaluation results on uploaded data.')
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric('Accuracy',  f'{accuracy_score(y, preds):.3f}')
-    c2.metric('Precision', f'{precision_score(y, preds):.3f}')
-    c3.metric('Recall',    f'{recall_score(y, preds):.3f}')
-    c4.metric('F1 Score',  f'{f1_score(y, preds):.3f}')
-    c5.metric('ROC-AUC',   f'{roc_auc_score(y, probs):.3f}')
-    st.pyplot(plot_results(y, probs))
-else:
-    st.info('No `Survived` column found — showing predictions only.')
+if df is not None:
+    X = transform(df, ckpt['params'])
+    with torch.no_grad():
+        logits = model(torch.tensor(X)).numpy()
+    probs = 1 / (1 + np.exp(-logits))
+    preds = (probs >= 0.5).astype(int)
 
-st.subheader('Predictions')
-out = pd.DataFrame({
-    'Name':       df['Name'] if 'Name' in df.columns else df.index,
-    'Pclass':     df['Pclass'],
-    'Sex':        df['Sex'],
-    'Age':        df['Age'],
-    'Actual':     df['Survived'].map(LABEL) if 'Survived' in df.columns else '—',
-    'Prediction': pd.Series(preds).map(LABEL),
-    'P(Survive)': probs.round(3),
-})
-st.dataframe(out, use_container_width=True)
+    if 'Survived' in df.columns:
+        y = df['Survived'].values
+        st.markdown('**Evaluation results on uploaded data:**')
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric('Accuracy',  f'{accuracy_score(y, preds):.3f}')
+        c2.metric('Precision', f'{precision_score(y, preds):.3f}')
+        c3.metric('Recall',    f'{recall_score(y, preds):.3f}')
+        c4.metric('F1 Score',  f'{f1_score(y, preds):.3f}')
+        c5.metric('ROC-AUC',   f'{roc_auc_score(y, probs):.3f}')
+        st.pyplot(plot_results(y, probs))
+    else:
+        st.markdown('No `Survived` column in uploaded data — showing validation results from checkpoint.')
+        m = ckpt['val_metrics']
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric('Accuracy',  f'{m["accuracy"]:.3f}')
+        c2.metric('Precision', f'{m["precision"]:.3f}')
+        c3.metric('Recall',    f'{m["recall"]:.3f}')
+        c4.metric('F1 Score',  f'{m["f1"]:.3f}')
+        c5.metric('ROC-AUC',   f'{m["roc_auc"]:.3f}')
+        vd = ckpt['val_data']
+        st.pyplot(plot_results(vd['y_true'], vd['y_probs']))
+
+    st.subheader('Predictions')
+    out = pd.DataFrame({
+        'Name':       df['Name'] if 'Name' in df.columns else df.index,
+        'Pclass':     df['Pclass'],
+        'Sex':        df['Sex'],
+        'Age':        df['Age'],
+        'Actual':     df['Survived'].map(LABEL) if 'Survived' in df.columns else '—',
+        'Prediction': pd.Series(preds).map(LABEL),
+        'P(Survive)': probs.round(3),
+    })
+    st.dataframe(out, use_container_width=True)
+else:
+    st.info('Upload a CSV in Step 2 to run inference and view results.')
