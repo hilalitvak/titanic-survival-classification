@@ -19,7 +19,8 @@ End-to-end classification pipeline predicting Titanic passenger survival using a
 │   ├── train.py               # Standalone training script
 │   └── evaluate.py            # Metrics + plots (shared by train + app)
 ├── app/
-│   └── ds_app.py              # Streamlit inference UI
+│   ├── ds_app.py              # Streamlit inference UI
+│   └── titanic-sinking.gif    # Header GIF displayed in the app
 ├── requirements.txt
 └── README.md
 ```
